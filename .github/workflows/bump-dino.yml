@@ -40,7 +40,9 @@ jobs:
           sha="$(curl -fsSL "$url" | sha256sum | cut -d' ' -f1)"
           sed -i -E "s|refs/tags/v[0-9.]+\.tar\.gz|refs/tags/v${version}.tar.gz|" Formula/dino.rb
           sed -i -E "s|sha256 \"[0-9a-f]{64}\"|sha256 \"${sha}\"|" Formula/dino.rb
-          git diff Formula/dino.rb
+          sed -i -E "s|version \"[0-9.]+\"|version \"${version}\"|" Casks/dino-app.rb
+          sed -i -E "s|sha256 \"[0-9a-f]{64}\"|sha256 \"${sha}\"|" Casks/dino-app.rb
+          git diff Formula/dino.rb Casks/dino-app.rb
 
       - name: Open pull request
         if: steps.check.outputs.version
