@@ -13,7 +13,7 @@ jobs:
   bump:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check for a new release
         id: check
@@ -44,7 +44,7 @@ jobs:
 
       - name: Open pull request
         if: steps.check.outputs.version
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: bump-dino-${{ steps.check.outputs.version }}
           delete-branch: true
