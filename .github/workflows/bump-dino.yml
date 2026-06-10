@@ -1,0 +1,60 @@
+name: Bump Dino formula
+
+on:
+  schedule:
+    - cron: "23 7 * * *" # daily, 07:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for a new release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest="$(gh api repos/dino/dino/releases/latest --jq .tag_name)"
+          latest="${latest#v}"
+          current="$(sed -n 's|.*refs/tags/v\(.*\)\.tar\.gz.*|\1|p' Formula/dino.rb)"
+          echo "current: $current, latest: $latest"
+          # Only proceed if latest is strictly newer (sort -V puts it last)
+          if [ "$latest" != "$current" ] && \
+             [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -n1)" = "$latest" ]; then
+            echo "version=$latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "Formula is up to date."
+          fi
+
+      - name: Update formula
+        if: steps.check.outputs.version
+        run: |
+          version="${{ steps.check.outputs.version }}"
+          url="https://github.com/dino/dino/archive/refs/tags/v${version}.tar.gz"
+          sha="$(curl -fsSL "$url" | sha256sum | cut -d' ' -f1)"
+          sed -i -E "s|refs/tags/v[0-9.]+\.tar\.gz|refs/tags/v${version}.tar.gz|" Formula/dino.rb
+          sed -i -E "s|sha256 \"[0-9a-f]{64}\"|sha256 \"${sha}\"|" Formula/dino.rb
+          git diff Formula/dino.rb
+
+      - name: Open pull request
+        if: steps.check.outputs.version
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: bump-dino-${{ steps.check.outputs.version }}
+          delete-branch: true
+          commit-message: "dino ${{ steps.check.outputs.version }}"
+          title: "dino ${{ steps.check.outputs.version }}"
+          body: |
+            Automated bump to [v${{ steps.check.outputs.version }}](https://github.com/dino/dino/releases/tag/v${{ steps.check.outputs.version }}).
+
+            Before merging, verify the build locally:
+            ```
+            brew install --build-from-source Formula/dino.rb
+            brew test dino
+            ```
