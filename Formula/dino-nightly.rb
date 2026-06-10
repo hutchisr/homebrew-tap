@@ -135,8 +135,11 @@ class DinoNightly < Formula
       A macOS application bundle was installed to:
         #{opt_prefix}/Dino Nightly.app
 
-      To launch it from Finder / Launchpad / Spotlight, symlink it into
-      Applications (this path is stable across upgrades):
+      To install it into /Applications (formulae are sandboxed and cannot
+      write there themselves), use the companion cask:
+        brew install --cask hutchisr/tap/dino-nightly-app
+
+      Or symlink it manually (this path is stable across upgrades):
         ln -sfn "#{opt_prefix}/Dino Nightly.app" "/Applications/Dino Nightly.app"
 
       This formula is keg-only; to use the nightly CLI binary directly:

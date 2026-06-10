@@ -39,16 +39,18 @@ jobs:
           base="$(gh api repos/dino/dino/releases/latest --jq .tag_name)"
           base="${base#v}"
           stamp="$(date -u +%Y%m%d)"
-          sed -i -E "s|archive/[0-9a-f]{40}\.tar\.gz|archive/${commit}.tar.gz|" Formula/dino-nightly.rb
-          sed -i -E "s|version \"[0-9.]+\"|version \"${base}.${stamp}\"|" Formula/dino-nightly.rb
-          sed -i -E "s|sha256 \"[0-9a-f]{64}\"|sha256 \"${sha}\"|" Formula/dino-nightly.rb
-          git diff Formula/dino-nightly.rb
+          for f in Formula/dino-nightly.rb Casks/dino-nightly-app.rb; do
+            sed -i -E "s|archive/[0-9a-f]{40}\.tar\.gz|archive/${commit}.tar.gz|" "$f"
+            sed -i -E "s|version \"[0-9.]+\"|version \"${base}.${stamp}\"|" "$f"
+            sed -i -E "s|sha256 \"[0-9a-f]{64}\"|sha256 \"${sha}\"|" "$f"
+          done
+          git diff Formula/dino-nightly.rb Casks/dino-nightly-app.rb
 
       - name: Commit and push
         if: steps.check.outputs.sha
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/dino-nightly.rb
+          git add Formula/dino-nightly.rb Casks/dino-nightly-app.rb
           git commit -m "dino-nightly: bump to ${{ steps.check.outputs.sha }}"
           git push
