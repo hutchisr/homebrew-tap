@@ -121,13 +121,12 @@ class Dino < Formula
       A macOS application bundle was installed to:
         #{opt_prefix}/Dino.app
 
-      To launch Dino from Finder / Launchpad / Spotlight, symlink it into
-      Applications (this path is stable across upgrades):
-        ln -sfn #{opt_prefix}/Dino.app /Applications/Dino.app
+      To install it into /Applications (formulae are sandboxed and cannot
+      write there themselves), use the companion cask:
+        brew install --cask hutchisr/tap/dino-app
 
-      The bundle is unsigned, so on first launch right-click it and choose
-      Open, or clear the quarantine flag:
-        xattr -dr com.apple.quarantine #{opt_prefix}/Dino.app
+      Or symlink it manually (this path is stable across upgrades):
+        ln -sfn #{opt_prefix}/Dino.app /Applications/Dino.app
     EOS
   end
 
