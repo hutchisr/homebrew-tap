@@ -1,0 +1,54 @@
+name: Bump Dino nightly
+
+on:
+  schedule:
+    - cron: "41 8 * * *" # daily, 08:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check upstream master for new commits
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest="$(gh api repos/dino/dino/commits/master --jq .sha)"
+          current="$(sed -n 's|.*archive/\([0-9a-f]\{40\}\)\.tar\.gz.*|\1|p' Formula/dino-nightly.rb)"
+          echo "current: $current"
+          echo "latest:  $latest"
+          if [ "$latest" != "$current" ]; then
+            echo "sha=$latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "Formula is up to date."
+          fi
+
+      - name: Update formula
+        if: steps.check.outputs.sha
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          commit="${{ steps.check.outputs.sha }}"
+          sha="$(curl -fsSL "https://github.com/dino/dino/archive/${commit}.tar.gz" | sha256sum | cut -d' ' -f1)"
+          base="$(gh api repos/dino/dino/releases/latest --jq .tag_name)"
+          base="${base#v}"
+          stamp="$(date -u +%Y%m%d)"
+          sed -i -E "s|archive/[0-9a-f]{40}\.tar\.gz|archive/${commit}.tar.gz|" Formula/dino-nightly.rb
+          sed -i -E "s|version \"[0-9.]+\"|version \"${base}.${stamp}\"|" Formula/dino-nightly.rb
+          sed -i -E "s|sha256 \"[0-9a-f]{64}\"|sha256 \"${sha}\"|" Formula/dino-nightly.rb
+          git diff Formula/dino-nightly.rb
+
+      - name: Commit and push
+        if: steps.check.outputs.sha
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/dino-nightly.rb
+          git commit -m "dino-nightly: bump to ${{ steps.check.outputs.sha }}"
+          git push

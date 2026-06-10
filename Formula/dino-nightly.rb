@@ -1,9 +1,23 @@
-class Dino < Formula
-  desc "Modern XMPP client"
+# Nightly counterpart of Formula/dino.rb, pinned to an upstream master
+# commit. The pinned commit/version/sha256 are bumped automatically by
+# .github/workflows/bump-dino-nightly.yml; keep build logic changes in
+# sync with Formula/dino.rb.
+#
+# (Named dino-nightly rather than dino@nightly because Homebrew's
+# name-to-class mapping only supports a digit after the "@".)
+class DinoNightly < Formula
+  desc "Modern XMPP client (nightly build of upstream master)"
   homepage "https://dino.im"
-  url "https://github.com/dino/dino/archive/refs/tags/v0.5.1.tar.gz"
-  sha256 "2658b83abe1203b2dd4d6444519f615b979faaac7e97f384e655bff85769584b"
+  url "https://github.com/dino/dino/archive/45723ac201c1905571f9f78c8c970828db97139a.tar.gz"
+  version "0.5.1.20260610"
+  sha256 "2ffb2f0b37b8c29361a11a5cb3218532b979bc4767760a8414625148e4523f93"
   license "GPL-3.0-or-later"
+
+  livecheck do
+    skip "Pinned to upstream master; bumped nightly by CI"
+  end
+
+  keg_only "it conflicts with the dino formula; both can stay installed"
 
   depends_on "librsvg" => :build # rsvg-convert, to rasterize the app icon
   depends_on "meson" => :build
@@ -51,17 +65,17 @@ class Dino < Formula
   end
 
   # Wrap the installed CLI binary in a proper macOS .app so Dino can be
-  # launched from Finder / Launchpad / Spotlight. The bundle is kept in the
-  # keg (not auto-linked); see caveats for adding it to /Applications.
+  # launched from Finder / Launchpad / Spotlight. Named "Dino Nightly" with
+  # its own bundle identifier so it can coexist with the release Dino.app.
   def build_app_bundle
-    app = prefix/"Dino.app"
+    app = prefix/"Dino Nightly.app"
     (app/"Contents/MacOS").mkpath
     (app/"Contents/Resources").mkpath
 
     # Launcher: Finder gives us none of Homebrew's environment, so point GTK
     # at the schemas, pixbuf loaders, GIO TLS modules (needed for XMPP) and
     # GStreamer plugins (calls) before exec'ing the real binary.
-    launcher = app/"Contents/MacOS/Dino"
+    launcher = app/"Contents/MacOS/Dino Nightly"
     launcher.write <<~SH
       #!/bin/bash
       export PATH="#{HOMEBREW_PREFIX}/bin:$PATH"
@@ -99,10 +113,10 @@ class Dino < Formula
       <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
       <plist version="1.0">
       <dict>
-        <key>CFBundleName</key>            <string>Dino</string>
-        <key>CFBundleDisplayName</key>     <string>Dino</string>
-        <key>CFBundleIdentifier</key>      <string>im.dino.Dino</string>
-        <key>CFBundleExecutable</key>      <string>Dino</string>
+        <key>CFBundleName</key>            <string>Dino Nightly</string>
+        <key>CFBundleDisplayName</key>     <string>Dino Nightly</string>
+        <key>CFBundleIdentifier</key>      <string>im.dino.Dino.nightly</string>
+        <key>CFBundleExecutable</key>      <string>Dino Nightly</string>
         <key>CFBundleIconFile</key>        <string>dino</string>
         <key>CFBundlePackageType</key>     <string>APPL</string>
         <key>CFBundleShortVersionString</key> <string>#{version}</string>
@@ -119,14 +133,19 @@ class Dino < Formula
   def caveats
     <<~EOS
       A macOS application bundle was installed to:
-        #{opt_prefix}/Dino.app
+        #{opt_prefix}/Dino Nightly.app
 
-      To install it into /Applications (formulae are sandboxed and cannot
-      write there themselves), use the companion cask:
-        brew install --cask hutchisr/tap/dino-app
+      To launch it from Finder / Launchpad / Spotlight, symlink it into
+      Applications (this path is stable across upgrades):
+        ln -sfn "#{opt_prefix}/Dino Nightly.app" "/Applications/Dino Nightly.app"
 
-      Or symlink it manually (this path is stable across upgrades):
-        ln -sfn #{opt_prefix}/Dino.app /Applications/Dino.app
+      This formula is keg-only; to use the nightly CLI binary directly:
+        #{opt_bin}/dino
+
+      Nightly and release Dino share the same profile (~/.local/share/dino).
+      Each switch between them migrates the database schema in place, and
+      downgrading back to the release drops any columns the older schema
+      does not know about - so avoid alternating between them routinely.
     EOS
   end
 
@@ -135,7 +154,7 @@ class Dino < Formula
     # dino opens (and migrates!) its database even for --version.
     ENV["XDG_DATA_HOME"] = (testpath/"xdg").to_s
     system "#{bin}/dino", "--version"
-    assert_path_exists prefix/"Dino.app/Contents/MacOS/Dino"
-    assert_path_exists prefix/"Dino.app/Contents/Resources/dino.icns"
+    assert_path_exists prefix/"Dino Nightly.app/Contents/MacOS/Dino Nightly"
+    assert_path_exists prefix/"Dino Nightly.app/Contents/Resources/dino.icns"
   end
 end
