@@ -4,7 +4,7 @@ class Dino < Formula
   url "https://github.com/dino/dino/archive/refs/tags/v0.5.1.tar.gz"
   sha256 "2658b83abe1203b2dd4d6444519f615b979faaac7e97f384e655bff85769584b"
   license "GPL-3.0-or-later"
-  revision 1
+  revision 2
 
   depends_on "librsvg" => :build # rsvg-convert, to rasterize the app icon
   depends_on "meson" => :build
@@ -56,10 +56,12 @@ class Dino < Formula
               "metadata.mime_type = ContentType.get_mime_type(info.get_content_type());"
     inreplace "libdino/src/service/sfs_metadata.vala",
               'string mime_type = file.query_info("*", FileQueryInfoFlags.NONE).get_content_type();',
-              'string mime_type = ContentType.get_mime_type(file.query_info("*", FileQueryInfoFlags.NONE).get_content_type());'
+              "string mime_type = ContentType.get_mime_type(" \
+              'file.query_info("*", FileQueryInfoFlags.NONE).get_content_type());'
     inreplace "libdino/src/service/file_manager.vala",
               'if (file_info.get_content_type() != "application/octet-stream" || file_transfer.mime_type == null) {',
-              'if (ContentType.get_mime_type(file_info.get_content_type()) != "application/octet-stream" || file_transfer.mime_type == null) {'
+              'if (ContentType.get_mime_type(file_info.get_content_type()) != "application/octet-stream" ' \
+              "|| file_transfer.mime_type == null) {"
     inreplace "libdino/src/service/file_manager.vala",
               "file_transfer.mime_type = file_info.get_content_type();",
               "file_transfer.mime_type = ContentType.get_mime_type(file_info.get_content_type());"
@@ -68,7 +70,8 @@ class Dino < Formula
               "string mime_type = ContentType.get_mime_type(file_info.get_content_type());"
     inreplace "main/src/ui/util/file_metadata_providers.vala",
               'string? mime_type = file.query_info("*", FileQueryInfoFlags.NONE).get_content_type();',
-              'string? mime_type = ContentType.get_mime_type(file.query_info("*", FileQueryInfoFlags.NONE).get_content_type());'
+              "string? mime_type = ContentType.get_mime_type(" \
+              'file.query_info("*", FileQueryInfoFlags.NONE).get_content_type());'
 
     system "meson", "setup", "build", *std_meson_args
     system "meson", "compile", "-C", "build"
@@ -97,9 +100,11 @@ class Dino < Formula
       export GDK_PIXBUF_MODULE_FILE="#{HOMEBREW_PREFIX}/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache"
       export GIO_EXTRA_MODULES="#{HOMEBREW_PREFIX}/lib/gio/modules"
       export GST_PLUGIN_SYSTEM_PATH_1_0="#{HOMEBREW_PREFIX}/lib/gstreamer-1.0"
-      exec "#{opt_bin}/dino" "$@"
+      exec "$(dirname "$0")/dino-bin" "$@"
     SH
     launcher.chmod 0755
+
+    # See post_install for the Contents/MacOS/dino-bin symlink.
 
     # Rasterize the scalable app icon into a multi-resolution .icns.
     svg = "main/data/icons/scalable/apps/im.dino.Dino.svg"
@@ -143,6 +148,22 @@ class Dino < Formula
     XML
   end
 
+  # GLib's Cocoa notification backend refuses to post unless the running
+  # executable lives inside an app bundle ([NSBundle mainBundle] has no
+  # bundleIdentifier otherwise), so native macOS notifications only work
+  # if we exec the binary from a path within the bundle. A symlink works:
+  # NSBundle uses the exec'd path without resolving symlinks. Pointing it
+  # at the opt path (stable across upgrades) means the bundle the dino-app
+  # cask copies into /Applications keeps running the current keg's binary
+  # without a cask reinstall after upgrades. Created in post_install because
+  # the install step relativizes in-prefix symlinks inside the keg, and the
+  # relative form breaks once the cask dittos the bundle to /Applications
+  # (different directory depth). Named "dino-bin" because APFS is
+  # case-insensitive and "dino" would collide with the "Dino" launcher.
+  def post_install
+    ln_sf opt_bin/"dino", prefix/"Dino.app/Contents/MacOS/dino-bin"
+  end
+
   def caveats
     <<~EOS
       A macOS application bundle was installed to:
@@ -163,6 +184,7 @@ class Dino < Formula
     ENV["XDG_DATA_HOME"] = (testpath/"xdg").to_s
     system "#{bin}/dino", "--version"
     assert_path_exists prefix/"Dino.app/Contents/MacOS/Dino"
+    assert_path_exists prefix/"Dino.app/Contents/MacOS/dino-bin"
     assert_path_exists prefix/"Dino.app/Contents/Resources/dino.icns"
   end
 end

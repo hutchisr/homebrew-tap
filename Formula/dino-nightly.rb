@@ -84,9 +84,11 @@ class DinoNightly < Formula
       export GDK_PIXBUF_MODULE_FILE="#{HOMEBREW_PREFIX}/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache"
       export GIO_EXTRA_MODULES="#{HOMEBREW_PREFIX}/lib/gio/modules"
       export GST_PLUGIN_SYSTEM_PATH_1_0="#{HOMEBREW_PREFIX}/lib/gstreamer-1.0"
-      exec "#{opt_bin}/dino" "$@"
+      exec "$(dirname "$0")/dino-bin" "$@"
     SH
     launcher.chmod 0755
+
+    # See post_install for the Contents/MacOS/dino-bin symlink.
 
     # Rasterize the scalable app icon into a multi-resolution .icns.
     svg = "main/data/icons/scalable/apps/im.dino.Dino.svg"
@@ -130,6 +132,23 @@ class DinoNightly < Formula
     XML
   end
 
+  # GLib's Cocoa notification backend refuses to post unless the running
+  # executable lives inside an app bundle ([NSBundle mainBundle] has no
+  # bundleIdentifier otherwise), so native macOS notifications only work
+  # if we exec the binary from a path within the bundle. A symlink works:
+  # NSBundle uses the exec'd path without resolving symlinks. Pointing it
+  # at the opt path (stable across upgrades) means the bundle the
+  # dino-nightly-app cask copies into /Applications keeps running the
+  # current keg's binary without a cask reinstall after upgrades. Created in
+  # post_install because the install step relativizes in-prefix symlinks
+  # inside the keg, and the relative form breaks once the cask dittos the
+  # bundle to /Applications (different directory depth). Named "dino-bin"
+  # because APFS is case-insensitive and "dino" would collide with the
+  # "Dino Nightly" launcher script.
+  def post_install
+    ln_sf opt_bin/"dino", prefix/"Dino Nightly.app/Contents/MacOS/dino-bin"
+  end
+
   def caveats
     <<~EOS
       A macOS application bundle was installed to:
@@ -158,6 +177,7 @@ class DinoNightly < Formula
     ENV["XDG_DATA_HOME"] = (testpath/"xdg").to_s
     system "#{bin}/dino", "--version"
     assert_path_exists prefix/"Dino Nightly.app/Contents/MacOS/Dino Nightly"
+    assert_path_exists prefix/"Dino Nightly.app/Contents/MacOS/dino-bin"
     assert_path_exists prefix/"Dino Nightly.app/Contents/Resources/dino.icns"
   end
 end
