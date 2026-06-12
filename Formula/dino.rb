@@ -4,6 +4,7 @@ class Dino < Formula
   url "https://github.com/dino/dino/archive/refs/tags/v0.5.1.tar.gz"
   sha256 "2658b83abe1203b2dd4d6444519f615b979faaac7e97f384e655bff85769584b"
   license "GPL-3.0-or-later"
+  revision 1
 
   depends_on "librsvg" => :build # rsvg-convert, to rasterize the app icon
   depends_on "meson" => :build
@@ -42,6 +43,32 @@ class Dino < Formula
     Dir["plugins/*/meson.build"].each do |f|
       inreplace f, "name_prefix: ''", "name_prefix: '', name_suffix: 'so'"
     end
+
+    # On macOS, GLib's g_file_info_get_content_type() returns Apple UTIs
+    # ("public.png") rather than MIME types ("image/png"). Dino 0.5.x stores
+    # and compares these as if they were MIME types, so image previews never
+    # render and sent files are advertised to peers with bogus MIME types.
+    # Convert with g_content_type_get_mime_type() (a no-op on Linux).
+    # Backport of upstream master's fix (dino/dino commit 5fb3de64,
+    # "Handle content type != mime type"); drop once a release contains it.
+    inreplace "libdino/src/service/sfs_metadata.vala",
+              "metadata.mime_type = info.get_content_type();",
+              "metadata.mime_type = ContentType.get_mime_type(info.get_content_type());"
+    inreplace "libdino/src/service/sfs_metadata.vala",
+              'string mime_type = file.query_info("*", FileQueryInfoFlags.NONE).get_content_type();',
+              'string mime_type = ContentType.get_mime_type(file.query_info("*", FileQueryInfoFlags.NONE).get_content_type());'
+    inreplace "libdino/src/service/file_manager.vala",
+              'if (file_info.get_content_type() != "application/octet-stream" || file_transfer.mime_type == null) {',
+              'if (ContentType.get_mime_type(file_info.get_content_type()) != "application/octet-stream" || file_transfer.mime_type == null) {'
+    inreplace "libdino/src/service/file_manager.vala",
+              "file_transfer.mime_type = file_info.get_content_type();",
+              "file_transfer.mime_type = ContentType.get_mime_type(file_info.get_content_type());"
+    inreplace "main/src/ui/file_send_overlay.vala",
+              "string mime_type = file_info.get_content_type();",
+              "string mime_type = ContentType.get_mime_type(file_info.get_content_type());"
+    inreplace "main/src/ui/util/file_metadata_providers.vala",
+              'string? mime_type = file.query_info("*", FileQueryInfoFlags.NONE).get_content_type();',
+              'string? mime_type = ContentType.get_mime_type(file.query_info("*", FileQueryInfoFlags.NONE).get_content_type());'
 
     system "meson", "setup", "build", *std_meson_args
     system "meson", "compile", "-C", "build"
