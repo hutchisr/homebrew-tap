@@ -57,6 +57,21 @@ class DinoNightly < Formula
       inreplace f, "name_prefix: ''", "name_prefix: '', name_suffix: 'so'"
     end
 
+    # Dino reuses the conversation id as the notification id so each
+    # conversation keeps a single entry in the notification list. With the
+    # legacy NSUserNotificationCenter API that GLib's Cocoa backend uses,
+    # delivering a notification whose identifier matches an already-delivered
+    # one replaces it in Notification Center WITHOUT presenting a banner - so
+    # only the first message of a conversation ever pops. Withdraw first
+    # (which removes the delivered entry on the Cocoa backend) so every
+    # message banners while still keeping one entry per conversation.
+    inreplace "main/src/ui/notifier_gnotifications.vala",
+              "GLib.Application.get_default().send_notification(" \
+              "conversation.id.to_string(), notifications[conversation]);",
+              "GLib.Application.get_default().withdraw_notification(conversation.id.to_string());\n" \
+              "            GLib.Application.get_default().send_notification(" \
+              "conversation.id.to_string(), notifications[conversation]);"
+
     system "meson", "setup", "build", *std_meson_args
     system "meson", "compile", "-C", "build"
     system "meson", "install", "-C", "build"

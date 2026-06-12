@@ -4,7 +4,7 @@ class Dino < Formula
   url "https://github.com/dino/dino/archive/refs/tags/v0.5.1.tar.gz"
   sha256 "2658b83abe1203b2dd4d6444519f615b979faaac7e97f384e655bff85769584b"
   license "GPL-3.0-or-later"
-  revision 2
+  revision 3
 
   depends_on "librsvg" => :build # rsvg-convert, to rasterize the app icon
   depends_on "meson" => :build
@@ -72,6 +72,21 @@ class Dino < Formula
               'string? mime_type = file.query_info("*", FileQueryInfoFlags.NONE).get_content_type();',
               "string? mime_type = ContentType.get_mime_type(" \
               'file.query_info("*", FileQueryInfoFlags.NONE).get_content_type());'
+
+    # Dino reuses the conversation id as the notification id so each
+    # conversation keeps a single entry in the notification list. With the
+    # legacy NSUserNotificationCenter API that GLib's Cocoa backend uses,
+    # delivering a notification whose identifier matches an already-delivered
+    # one replaces it in Notification Center WITHOUT presenting a banner - so
+    # only the first message of a conversation ever pops. Withdraw first
+    # (which removes the delivered entry on the Cocoa backend) so every
+    # message banners while still keeping one entry per conversation.
+    inreplace "main/src/ui/notifier_gnotifications.vala",
+              "GLib.Application.get_default().send_notification(" \
+              "conversation.id.to_string(), notifications[conversation]);",
+              "GLib.Application.get_default().withdraw_notification(conversation.id.to_string());\n" \
+              "            GLib.Application.get_default().send_notification(" \
+              "conversation.id.to_string(), notifications[conversation]);"
 
     system "meson", "setup", "build", *std_meson_args
     system "meson", "compile", "-C", "build"
